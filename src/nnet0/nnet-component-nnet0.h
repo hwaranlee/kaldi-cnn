@@ -231,55 +231,7 @@ namespace cnsl {
 
 		};
 		
-		class ProbReLUComponent: public nnet2::NonlinearComponent {
-		public:
-
-			//explicit ProbReLUComponent(int32 dim, bool expectation): NonlinearComponent(dim) { expectation_= expectation; }
-			//explicit ProbReLUComponent(int32 dim): NonlinearComponent(dim) {}
-			explicit ProbReLUComponent(const ProbReLUComponent &other);
-
-			void Init(int32 dim, bool expectation);
-			ProbReLUComponent(int32 dim, bool expectation = false) {
-				Init(dim, expectation);
-			}
-			ProbReLUComponent(): dim_(0), expectation_(false) { }
-			virtual int32 InputDim() const { return dim_; }
-			virtual int32 OutputDim() const { return dim_; }
-			virtual void InitFromString(std::string args);
-
-			virtual void Read(std::istream &is, bool binary);
-			virtual void Write(std::ostream &os, bool binary) const;		
-
-			virtual std::string Type() const { return "ProbReLUComponent"; }
-			virtual Component* Copy() const;		
-			virtual bool BackpropNeedsInput() const { return false; }
-			virtual bool BackpropNeedsOutput() const { return true; }
-
-			using Component::Propagate; // to avoid name hiding
-			virtual void Propagate(const ChunkInfo &in_info,
-				const ChunkInfo &out_info,
-				const CuMatrixBase<BaseFloat> &in,
-				CuMatrixBase<BaseFloat> *out) const; 
-			virtual void Backprop(const ChunkInfo &in_info,
-				const ChunkInfo &out_info,
-				const CuMatrixBase<BaseFloat> &in_value,
-				const CuMatrixBase<BaseFloat> &out_value,                        
-				const CuMatrixBase<BaseFloat> &out_deriv,
-				Component *to_update, // may be identical to "this".
-				CuMatrix<BaseFloat> *in_deriv) const;
-
-			void ResetGenerator() { random_generator_.SeedGpu(0); }
-			void SetExpectation(bool boolExpectation) { expectation_ = boolExpectation; }
-			virtual std::string Info() const;
-
-		private:
-			int32 dim_;  
-			ProbReLUComponent &operator = (const ProbReLUComponent &other); // Disallow.
-			CuRand<BaseFloat> random_generator_;
-			bool expectation_;
-		};
-		
-		class ConvolutionComponentContainer: public nnet2::UpdatableComponent{
+	class ConvolutionComponentContainer: public nnet2::UpdatableComponent{
 
 		public:
 			/*
