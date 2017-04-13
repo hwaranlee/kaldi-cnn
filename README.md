@@ -53,23 +53,25 @@ Copy and paste the followings as member functions of class CuMatrixBase
 												int32 in_height, int32 in_width, int32 pool_height_dim, int32 pool_width_dim, int32 pool_channel_dim) const;
 
 
-2. In the file "src/nnet2/nnet-component.cc"
-1) add: #include "nnet0/nnet-component-nnet0.h"
-2) add followings under "Component\* Component::NewComponentOfType(const std::string &component_type) "
-<pre><code>
-	  } else if (component_type == "ConvolutionComponent") {
-	    ans = new cnsl::nnet0::ConvolutionComponent();
-	  } else if (component_type == "MaxpoolComponent") {
-	    ans = new cnsl::nnet0::MaxpoolComponent();
-	  } else if (component_type == "FullyConnectedComponent") {
-          //AffineComponent Hwaran version
-	    ans = new cnsl::nnet0::FullyConnectedComponent();
-	  }
-</code></pre>
-- In the file "src/nnet0/nnet-component-nnet0.h"
-3) Change the ChunkInfo's private variables to be "public"
-4) In the class NonlinearComponent, change 'UpdateStates' function to be "public"
+2. Add new components in nnet0 into nnet2 header and source codes.
 
++ In the file "src/nnet2/nnet-component.cc"
+	+ add: #include "nnet0/nnet-component-nnet0.h"
+	+  add followings under "Component\* Component::NewComponentOfType(const std::string &component_type) "
+<pre><code>
+} else if (component_type == "ConvolutionComponent") {
+    ans = new cnsl::nnet0::ConvolutionComponent();
+  } else if (component_type == "MaxpoolComponent") {
+    ans = new cnsl::nnet0::MaxpoolComponent();
+  } else if (component_type == "FullyConnectedComponent") {
+         //AffineComponent Hwaran version
+    ans = new cnsl::nnet0::FullyConnectedComponent();
+  }
+</code></pre>
+
++ In the file "src/nnet0/nnet-component-nnet0.h"
+	+ Change the ChunkInfo's private variables to be "public"
+	+ In the class NonlinearComponent, change 'UpdateStates' function to be "public"
 
 3. Add "src/cnslmat" folder and make
 
@@ -79,9 +81,10 @@ Copy and paste the followings as member functions of class CuMatrixBase
 ADDLIBS ../nnet0/cnsl-nnet0.a ../cnslmat/cnsl-cnslmat.a
 
 6. Make all source files
-- cd ../src
-- make
-
+<pre><code>
+cd ../src
+make
+</code></pre>
 
 # Guide to run the library
 1. To train CNN, run "local/nnet0/run_nnet.sh". 
