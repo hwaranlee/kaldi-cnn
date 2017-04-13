@@ -56,7 +56,7 @@ Copy and paste the followings as member functions of class CuMatrixBase
 2. In the file "src/nnet2/nnet-component.cc"
 1) add: #include "nnet0/nnet-component-nnet0.h"
 2) add followings under "Component\* Component::NewComponentOfType(const std::string &component_type) "
-
+<pre><code>
 	  } else if (component_type == "ConvolutionComponent") {
 	    ans = new cnsl::nnet0::ConvolutionComponent();
 	  } else if (component_type == "MaxpoolComponent") {
@@ -65,7 +65,7 @@ Copy and paste the followings as member functions of class CuMatrixBase
           //AffineComponent Hwaran version
 	    ans = new cnsl::nnet0::FullyConnectedComponent();
 	  }
-
+</code></pre>
 - In the file "src/nnet0/nnet-component-nnet0.h"
 3) Change the ChunkInfo's private variables to be "public"
 4) In the class NonlinearComponent, change 'UpdateStates' function to be "public"
@@ -84,8 +84,8 @@ ADDLIBS ../nnet0/cnsl-nnet0.a ../cnslmat/cnsl-cnslmat.a
 
 
 # Guide to run the library
-1. To train CNN, run "local/nnet0/run_nnet.sh"
-Before you run the code, you need a network configuration file "nnet.conf" in experiment directory. Also when the network includes dropout layer, it needs "dropout_scale.config" file.
+1. To train CNN, run "local/nnet0/run_nnet.sh". 
+Before you run the code, you need a network configuration file "nnet.conf" in your experiment directory. Also when the network includes dropout layers, "dropout_scale.config" file is required.
 
 
 # Note
