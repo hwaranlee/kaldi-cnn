@@ -58,8 +58,7 @@ Copy and paste the followings as member functions of class CuMatrixBase
 + In the file "src/nnet2/nnet-component.cc"
 	+ add: #include "nnet0/nnet-component-nnet0.h"
 	+  add followings under "Component\* Component::NewComponentOfType(const std::string &component_type) "
-<pre><code>
-} else if (component_type == "ConvolutionComponent") {
+<pre><code> } else if (component_type == "ConvolutionComponent") {
     ans = new cnsl::nnet0::ConvolutionComponent();
   } else if (component_type == "MaxpoolComponent") {
     ans = new cnsl::nnet0::MaxpoolComponent();
@@ -81,8 +80,7 @@ Copy and paste the followings as member functions of class CuMatrixBase
 ADDLIBS ../nnet0/cnsl-nnet0.a ../cnslmat/cnsl-cnslmat.a
 
 6. Make all source files
-<pre><code>
-cd ../src
+<pre><code> cd ../src
 make
 </code></pre>
 
