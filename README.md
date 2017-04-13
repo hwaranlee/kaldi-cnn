@@ -1,7 +1,7 @@
 # kaldi-cnn
 
 ## Introduction
-This Git repository is the CNN source code upon the nnet2(Dan's DNN implementation) in KALDI Speech Recognition Toolkit, which is the implementation of the paper:
+This Git repository is the CNN source code following the nnet2 (Dan's DNN implementation) in KALDI Speech Recognition Toolkit, which is the implementation of the paper:
 Lee, Hwaran, et al. "Deep CNNs Along the Time Axis With Intermap Pooling for Robustness to Spectral Variations." IEEE Signal Processing Letters 23.10 (2016): 1310-1314. [[paper](https://arxiv.org/abs/1606.03207)]
 
 We provide:

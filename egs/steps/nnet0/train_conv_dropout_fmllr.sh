@@ -55,13 +55,13 @@ parallel_opts="-pe smp 16 -l ram_free=1G,mem_free=1G" # by default we use 16 thr
 # running options
 cleanup=true
 egs_dir=
-# lda_opts=
-# lda_dim=
+lda_opts=
+lda_dim=
 egs_opts=
-# transform_dir=     # If supplied, overrides alidir
+transform_dir=     # If supplied, overrides alidir
 cmvn_opts=  # will be passed to get_lda.sh and get_egs.sh, if supplied.
             # only relevant for "raw" features, not lda.
-feat_type="raw"  # Can be used to force "raw" features.
+feat_type=  # Can be used to force "raw" features.
 
 prior_subset_size=10000 # 10k samples per job, for computing priors.  Should be
                         # more than enough.
@@ -113,8 +113,9 @@ extra_opts=()
 [ ! -z "$cmvn_opts" ] && extra_opts+=(--cmvn-opts "$cmvn_opts")
 [ ! -z "$feat_type" ] && extra_opts+=(--feat-type "$feat_type")
 # [ ! -z "$online_ivector_dir" ] && extra_opts+=(--online-ivector-dir $online_ivector_dir)
-# [ -z "$transform_dir" ] && transform_dir=$alidir
-# extra_opts+=(--transform-dir $transform_dir)
+ [ -z "$transform_dir" ] && transform_dir=$alidir
+ extra_opts+=(--transform-dir $transform_dir)
+
 # extra_opts+=(--splice_width $splice_width)
 extra_opts+=(--left_context $splice_width)
 extra_opts+=(--right_context $splice_width)
@@ -208,7 +209,7 @@ else
 fi
 
 # training
-echo " || exit 1;"
+echo ""
 echo "$0: Training NN : max epochs $max_epoch , keep-lr-epoch $keep_lr_epoch "
 echo "$0: iteration per epoch $iters_per_epoch "
 
@@ -315,9 +316,8 @@ for epoch in $(seq -w $max_epoch); do
   for iters in $(seq -w $iters_per_epoch); do
    iters=`echo $iters|sed 's/^0*//'`
 
-  # [ -f $dir/$epoch.$iters.1.mdl ] && mdl_iter=$dir/$epoch.$iters.1.mdl && echo "EPOCH $epoch - ITER $iters : skipping" && continue # in case one model
-
-   [ -f $dir/log/train.$epoch.$iters.1.log ] && mdl_iter=$dir/$epoch.$iters.1.mdl && echo "EPOCH $epoch - ITER $iters : skipping" && continue # in case one model
+#   [ -f $dir/$epoch.$iters.1.mdl ] && mdl_iter=$dir/$epoch.$iters.1.mdl && echo "EPOCH $epoch - ITER $iters : skipping" && continue # in case one model
+ [ -f $dir/log/train.$epoch.$iters.1.log ] && mdl_iter=$dir/$epoch.$iters.1.mdl && echo "EPOCH $epoch - ITER $iters : skipping" && continue # in case one model
 
 
    $cmd $parallel_opts JOB=1:$num_jobs_nnet $dir/log/train.$epoch.$iters.JOB.log \
@@ -341,8 +341,8 @@ for epoch in $(seq -w $max_epoch); do
     mdl_iter=$dir/$epoch.$iters.mdl
    else
 	if [ $iters -gt 1 ]; then 
-		rm $dir/$epoch.$[$iters-1].1.mdl
-	fi
+                rm $dir/$epoch.$[$iters-1].1.mdl
+        fi
 	mdl_iter=$dir/$epoch.$iters.1.mdl
    fi
    this_tr_loss=$(perl -e '($nj,$pat)=@ARGV; $this_tr_loss=0; $num_frame=0; $acc_num_frame=0; $this_accuracy=0;
@@ -446,7 +446,7 @@ if [ 1 == $(bc <<< "${loss[0]} < ${loss_prev[0]}" ) ]; then
 	  (echo "learning rate : $learning_rate, having factor : $halving_factor [ $num_stop_halving / $max_stop_halving ] accumulated # halving: $num_stop_halving_acc"
 	   ) >> $logfile
 	   mdl_best=$dir/final.mdl	   
-	   nnet-am-copy --learning-rate=$learning_rate $mdl_best $mdl_temp || exit 1;
+	   nnet-am-copy --learning-rate=$learning_rate $mdl_best $mdl_temp
 	   cp $mdl_temp $dir/final.mdl
 	   mdl_best=$dir/final.mdl
 
@@ -462,7 +462,7 @@ else
   mdl_best=$mdl
   loss_prev[0]=${loss[0]}  || exit 1;
   loss_prev[1]=${loss[1]}  || exit 1;
-    cp $mdl_best $dir/final.mdl || exit 1;
+    cp $mdl_best $dir/final.mdl
 fi
 
   mv $dir/log/train.$epoch.1.1.log $dir/log/train.$epoch.log || exit 1;

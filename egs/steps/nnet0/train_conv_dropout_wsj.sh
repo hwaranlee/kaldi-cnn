@@ -10,6 +10,8 @@ cmd=run.pl
 io_opts="-tc 5" # for jobs with a lot of I/O, limits the number running at one time.   
 
 stage=-5
+srand=0
+
 
 # training options
 learning_rate=0.008
@@ -34,16 +36,14 @@ shuffle_seed=
 dropout_scales=1:1:1:0.5:0.5:1
 dropout_net=false
 prob_relu=false
-srand=0 #initialzation seed
 
 # learning rate scheduling
-max_epoch=50
+max_epoch=20
 # min_epoch=0 # keep training, disable weight rejection, start learn-rate halving as usual,
 keep_lr_epoch=0 # fix learning rate for N initial epochs,
 halving_factor=0.5
 max_stop_halving=6
 num_stop_halving=0
-num_stop_halving_acc=0
 
 # parallel options
 num_threads=16
@@ -73,7 +73,7 @@ echo "$0 $@"  # Print the command line for logging
 if [ -f path.sh ]; then . ./path.sh; fi
 . parse_options.sh || exit 1;
 
-if [ $# != 5 ]; then
+if [ $# != 7 ]; then
   echo "Usage: $0 [opts] <data> <lang> <train-ali-dir> <valid-data> <valid-ali-dir> <exp-dir> <nnet-config>"
   echo " e.g.: $0 data/train data/lang exp/tri4b_ali_si284 data/test_dev93 exp/tri4b_ali_dev93 exp/dir nnet.config"
   echo ""
@@ -85,16 +85,16 @@ fi
 data=$1
 lang=$2
 alidir=$3
-data_valid=
-alidir_valid=
-dir=$4
-nnet_config=$5
+data_valid=$4
+alidir_valid=$5
+dir=$6
+nnet_config=$7
 
 
 # Check some files.
-for f in $data/feats.scp $alidir/ali.1.gz $alidir/final.mdl $alidir/tree $nnet_config; do
-  [ ! -f $f ] && echo "$0: no such file $f" && exit 1;
-done
+#for f in $data/feats.scp $lang/L.fst $alidir/ali.1.gz $alidir/final.mdl $alidir/tree $nnet_config; do
+#  [ ! -f $f ] && echo "$0: no such file $f" && exit 1;
+#done
 
 # Set some variables.
 num_leaves=`tree-info $alidir/tree 2>/dev/null | grep num-pdfs | awk '{print $2}'` || exit 1
@@ -115,17 +115,12 @@ extra_opts=()
 # [ ! -z "$online_ivector_dir" ] && extra_opts+=(--online-ivector-dir $online_ivector_dir)
 # [ -z "$transform_dir" ] && transform_dir=$alidir
 # extra_opts+=(--transform-dir $transform_dir)
-# extra_opts+=(--splice_width $splice_width)
-extra_opts+=(--left_context $splice_width)
-extra_opts+=(--right_context $splice_width)
-
-
+extra_opts+=(--splice-width $splice_width) # for LDA
 
 feat_dim=40  # 40 coefficient Mel filterbank features
 echo $feat_dim > $dir/feat_dim
 
 ##  egs (add-deltas 부분 없음.. ㅜㅜ)
-:<< comment
 if [ $stage -le -3 ]; then
   echo "$0: calling get_egs0.sh"
   # training & valid data egs
@@ -137,26 +132,6 @@ if [ $stage -le -3 ]; then
       $data_valid $alidir_valid \
       $egs_dir || exit 1;
 fi
-
-
-if [ $stage -le -3 ]; then
-  echo "$0: calling get_egs.sh"
-  steps/nnet2/get_egs.sh $egs_opts "${extra_opts[@]}"  --io-opts "$io_opts" \
-    --samples-per-iter $samples_per_iter --stage $get_egs_stage \
-    --cmd "$cmd" $egs_opts $data $lang $alidir $egs_dir || exit 1;
-fi
-comment
-
-if [ $stage -le -3 ]; then
-  echo "$0: calling get_egs.sh"
-  steps/nnet2/get_egs.sh $egs_opts "${extra_opts[@]}" \
-      --samples-per-iter $samples_per_iter \
-      --num-jobs-nnet $num_jobs_nnet --stage $get_egs_stage \
-      --cmd "$cmd" $egs_opts --io-opts "$io_opts" \
-      $data $lang $alidir $dir || exit 1;
-fi
-
-
 
 iters_per_epoch=`cat $egs_dir/iters_per_epoch`  || exit 1;
 ! [ $num_jobs_nnet -eq `cat $egs_dir/num_jobs_nnet` ] && \
@@ -173,16 +148,6 @@ if [ $stage -le -2 ]; then
     nnet-am-init $alidir/tree $lang/topo "nnet-init --srand=$srand $dir/nnet.config -|" -\| \
     nnet-am-copy --learning-rate=$learning_rate - $dir/0.mdl || exit 1;
 fi
-
-# nnet.config example:
-# SpliceComponent input-dim=$ext_feat_dim left-context=$splice_width right-context=$splice_width const-component-dim=$ivector_dim
-# ConvolutionComponent in-height=$ext_feat_dim in-width=$in_width in-channel=$in_channel kernel-height=$kernel_height kernel-width=$kernel_width stride=$stride group=$group out-height=$out_height out-width=$out_width learning-rate=$initial_learning_rate param-stddev=$conv_stddev bias-stddev=$bias_stddev weight-decay=0.0002 momentum=0.9
-# MaxpoolComponent in-height=$out_height in-width=$out_width in-channel=$group pool-height-dim=$pool_h pool-width-dim=$pool_w pool-channel-dim=$pool_c
-# RectifiedLinearComponent dim=$affine_input_dim
-# NormalizeComponent dim=$affine_input_dim
-# FullyConnectedComponent input-dim=$pnorm_input_dim output-dim=$num_leaves learning-rate=$initial_learning_rate param-stddev=0 bias-stddev=0 weight-decay=0.0002 momentum=0.9
-# AffineComponentPreconditionedOnline input-dim=$pnorm_input_dim output-dim=$pnorm_output_dim $online_preconditioning_opts learning-rate=$initial_learning_rate param-stddev=$stddev bias-stddev=$bias_stddev
-# SoftmaxComponent dim=$num_leaves
 
 if [ $stage -le -1 ]; then
   echo "Training transition probabilities and setting priors"
@@ -208,7 +173,7 @@ else
 fi
 
 # training
-echo " || exit 1;"
+echo ""
 echo "$0: Training NN : max epochs $max_epoch , keep-lr-epoch $keep_lr_epoch "
 echo "$0: iteration per epoch $iters_per_epoch "
 
@@ -216,8 +181,7 @@ DATE=`date +\%y\%m\%d\%H\%M`
 logfile=$dir/train_summary_$DATE.log
 
 # cross-validation on original network
-#nj_valid=`cat $alidir_valid/num_jobs`
-nj_valid=1
+nj_valid=`cat $alidir_valid/num_jobs`
 
 test_mdl=$dir/0.mdl
  
@@ -233,7 +197,7 @@ fi
 
 if [ ! -f $dir/.init_valid ]; then
  $cmd $parallel_opts JOB=1:$nj_valid $dir/log/compute_prob_valid.0.JOB.log \
-nnet-compute-prob $test_mdl ark:$egs_dir/valid_diagnostic.egs || exit 1;
+nnet-compute-prob $test_mdl ark:$egs_dir/valid_egs.JOB.ark || exit 1;
  touch $dir/.init_valid
 fi
 
@@ -267,12 +231,10 @@ if [ ! -f $dir/lr ]; then
 	echo "$learning_rate" > $dir/lr
 	echo "${loss_prev[0]}" > $dir/loss_prev
 	echo "$num_stop_halving" > $dir/stopping
-	echo "$num_stop_halving" > $dir/stopping_acc
 else
 	learning_rate=`cat $dir/lr`
 	loss_prev[0]=`cat $dir/loss_prev`
 	num_stop_halving=`cat $dir/stopping`
-	num_stop_halving_acc=`cat $dir/stopping_acc`
 fi
 
 for epoch in $(seq -w $max_epoch); do
@@ -280,24 +242,10 @@ for epoch in $(seq -w $max_epoch); do
   echo -n "EPOCH $epoch: "
 
   mdl=$dir/$epoch.mdl
-  learning_stage=0
   
   # skip iteration if already done  
-  #  [ -f $mdl ] && echo "skipping... " && continue
-
-  if [ -f $mdl ]; then
-	 if [ -f $dir/log/compute_prob_valid.$epoch.1.log ]; then
-		 echo "skipping... " && continue;
-	 else
-		 learning_stage=1;
-	 fi
- else
-	 learning_stage=0;
- fi
-
+  [ -f $mdl ] && echo "skipping... " && continue
   if [ -f $dir/final.mdl ]; then mdl_best=$dir/final.mdl; fi
-  
-  if [ $learning_stage -le 0 ]; then
 
   #  mdl_iter=$dir/$[$epoch-1].mdl
   mdl_iter=$mdl_best
@@ -305,7 +253,6 @@ for epoch in $(seq -w $max_epoch); do
   learning_rate=`cat $dir/lr`
   loss_prev[0]=`cat $dir/loss_prev`
   num_stop_halving=`cat $dir/stopping`
-  num_stop_halving_acc=`cat $dir/stopping_acc`
 
   echo "lr : $learning_rate";
 
@@ -315,14 +262,12 @@ for epoch in $(seq -w $max_epoch); do
   for iters in $(seq -w $iters_per_epoch); do
    iters=`echo $iters|sed 's/^0*//'`
 
-  # [ -f $dir/$epoch.$iters.1.mdl ] && mdl_iter=$dir/$epoch.$iters.1.mdl && echo "EPOCH $epoch - ITER $iters : skipping" && continue # in case one model
-
+#   [ -f $dir/$epoch.$iters.1.mdl ] && mdl_iter=$dir/$epoch.$iters.1.mdl && echo "EPOCH $epoch - ITER $iters : skipping" && continue # in case one model
    [ -f $dir/log/train.$epoch.$iters.1.log ] && mdl_iter=$dir/$epoch.$iters.1.mdl && echo "EPOCH $epoch - ITER $iters : skipping" && continue # in case one model
-
 
    $cmd $parallel_opts JOB=1:$num_jobs_nnet $dir/log/train.$epoch.$iters.JOB.log \
       nnet-shuffle-egs --buffer-size=$shuffle_buffer_size --srand=$iters \
-      ark:$egs_dir/egs.1.$[$iters].ark ark:- \| \
+      ark:$egs_dir/egs.JOB.$[$iters-1].ark ark:- \| \
        nnet-train$parallel_suffix $parallel_train_opts \
         --minibatch-size=$minibatch_size --srand=$iters "$mdl_iter" \
         ark:- $dir/$epoch.$iters.JOB.mdl \
@@ -340,46 +285,40 @@ for epoch in $(seq -w $max_epoch); do
 
     mdl_iter=$dir/$epoch.$iters.mdl
    else
-	if [ $iters -gt 1 ]; then 
-		rm $dir/$epoch.$[$iters-1].1.mdl
-	fi
 	mdl_iter=$dir/$epoch.$iters.1.mdl
    fi
-   this_tr_loss=$(perl -e '($nj,$pat)=@ARGV; $this_tr_loss=0; $num_frame=0; $acc_num_frame=0; $this_accuracy=0;
+   this_tr_loss=$(perl -e '($nj,$pat)=@ARGV; $this_tr_loss=0; $num_frame=1; $acc_num_frame=0;
 	 for ($n=1;$n<=$nj;$n++) {
 	 $fn = sprintf($pat,$n);
 	 open(F, "<$fn") || die "Error opening log file $fn";
 	 while (<F>) {
-		 if (m/Did backprop on (\S+) examples, average log-prob per frame is (\S+) average frame-accuracy per frame is (\S+)/) {$num_frame=$1; $logprob=$2; $accuracy=$3;}
+		 if (m/Did backprop on (\S+) examples, average log-prob per frame is (\S+)/) {$num_frame=$1; $logprob=$2;}
 		 }
 	 close(F); 
 	 $this_tr_loss=$this_tr_loss + $num_frame * $logprob;
-	 $acc_num_frame=$acc_num_frame + $num_frame;
-	 $this_accuracy=$this_accuracy + $num_frame * $accuracy;
-         }
+	 $acc_num_frame=$acc_num_frame + $num_frame; }
 	 $this_tr_loss=$this_tr_loss/$acc_num_frame;
-	 $this_accuracy=$this_accuracy/$acc_num_frame;
-	 print "$this_tr_loss\n$this_accuracy"; ' $num_jobs_nnet $dir/log/train.$epoch.$iters.%d.log) || exit 1;
+	 print "$this_tr_loss\n"; ' $num_jobs_nnet $dir/log/train.$epoch.$iters.%d.log) || exit 1;
 
-        x=0
-        while read -r line; do this_tr_loss2[$x]=$line; x=$[$x+1]; done <<< "$this_tr_loss"	 
-#tr_loss=$(awk "BEGIN{print( $tr_loss+$this_tr_loss2[0] )}")
-	
-	echo "EPOCH $epoch - ITER $iters : $(printf "%.4f" ${this_tr_loss2[0]}) $(printf "%.4f" ${this_tr_loss2[1]})"
-         (
-        echo "EPOCH $epoch - ITER $iters : $(printf "%.4f" ${this_tr_loss2[0]}) $(printf "%.4f" ${this_tr_loss2[1]})"
-         )>> $logfile
-#	cat >$logfile << EOF
-#	EPOCH $epoch - ITER $iters : $(printf "%.4f" ${this_tr_loss2[0]}) $(printf "%.4f" ${this_tr_loss2[1]})
-#EOF
+	 echo "EPOCH $epoch - ITER $iters : $this_tr_loss" 
+	 (
+	 echo "EPOCH $epoch - ITER $iters : $this_tr_loss"
+	 )>> $logfile
+#	 tr_loss=`perl -e '($x,$y)=@ARGV; $ans=$x + $y; print "$ans"; ' $tr_loss $this_tr_loss`;
+	 tr_loss=$(awk "BEGIN{print( $tr_loss+$this_tr_loss )}")
+
+  if [ "$this_tr_loss2[0]" == "nan" ]; then
+        exit 1;
+  else
+        if [ $iters -gt 1 ]; then
+                rm $dir/$epoch.$[$iters-1].1.mdl
+        fi
+  fi
 
   done
 
   cp $mdl_iter $mdl || exit 1;
-  fi
-
-
-  if [ $learning_stage -le 1 ]; then
+ 
 # After training one epoch, check validation performance
 
 test_mdl=$dir/$epoch.mdl
@@ -394,7 +333,7 @@ elif $prob_relu; then
  test_mdl=$dir/$epoch.test.mdl
 fi
    $cmd $parallel_opts JOB=1:$nj_valid $dir/log/compute_prob_valid.$epoch.JOB.log \
-      nnet-compute-prob $test_mdl ark:$egs_dir/valid_diagnostic.egs || exit 1;
+      nnet-compute-prob $test_mdl ark:$egs_dir/valid_egs.JOB.ark || exit 1;
 fi
 
    validation=$(perl -e '($nj,$pat)=@ARGV; $num_frame=0; $logprob=0; $acc=0; $acc_num_frame=0; $this_loss=0; $this_acc=0;
@@ -418,17 +357,16 @@ fi
   rm $dir/$epoch.*.mdl || exit 1;
 
 #tr_loss=`perl -e '($x,$y)=@ARGV; $ans=$x / $y; print "$ans";' $tr_loss $iters_per_epoch`;
-#tr_loss=$(awk "BEGIN{print( $tr_loss/$iters_per_epoch )}")
+tr_loss=$(awk "BEGIN{print( $tr_loss/$this_tr_loss )}")
 
 echo "EPOCH $epoch "
+echo "TRAIN AVG.LOSS : $(printf "%.4f" $tr_loss) "
 echo "CROSSVAL AVG.LOSS $(printf "%.4f" ${loss[0]}) ACC $(printf "%.4f" ${loss[1]}) "
 (
 echo "EPOCH $epoch"
+echo "TRAIN AVG.LOSS : $(printf "%.4f" $tr_loss) "
 echo "CROSSVAL AVG.LOSS $(printf "%.4f" ${loss[0]}) ACC $(printf "%.4f" ${loss[1]}) "
 ) >> $logfile
-
-fi
-
 
 # stopping criteria
   
@@ -439,30 +377,27 @@ echo ""
 if [ 1 == $(bc <<< "${loss[0]} < ${loss_prev[0]}" ) ]; then
 	if [ "$epoch" -gt "$keep_lr_epoch" ]; then
 	 num_stop_halving=$[$num_stop_halving+1]
-	 num_stop_halving_acc=$[$num_stop_halving_acc+1]
 	 learning_rate=$(awk "BEGIN{print($learning_rate*$halving_factor)}")
 	 mdl_temp=$dir/temp.mdl
-	 echo "learning rate : $learning_rate, having factor : $halving_factor [ $num_stop_halving / $max_stop_halving ] accumulated # halving: $num_stop_halving_acc"
-	  (echo "learning rate : $learning_rate, having factor : $halving_factor [ $num_stop_halving / $max_stop_halving ] accumulated # halving: $num_stop_halving_acc"
+	 echo "learning rate : $learning_rate, having factor : $halving_factor [ $num_stop_halving / $max_stop_halving ] "
+	  (echo "learning rate : $learning_rate, having factor : $halving_factor [ $num_stop_halving / $max_stop_halving ] "
 	   ) >> $logfile
 	   mdl_best=$dir/final.mdl	   
-	   nnet-am-copy --learning-rate=$learning_rate $mdl_best $mdl_temp || exit 1;
+	   nnet-am-copy --learning-rate=$learning_rate $mdl_best $mdl_temp
 	   cp $mdl_temp $dir/final.mdl
 	   mdl_best=$dir/final.mdl
 
-#	 if [ $num_stop_halving -eq $max_stop_halving ] ; then
+#	 if [ $num_stop_halving -eq $max_stop_halving ]; then
 #	  mv $dir/log/train.$epoch.1.1.log $dir/log/train.$epoch.log || exit 1;
 #	  rm $dir/log/train.$epoch.*.*.log || exit 1
 #	   break;
 #	 fi
       fi
 else
-
-	num_stop_halving=0
   mdl_best=$mdl
   loss_prev[0]=${loss[0]}  || exit 1;
   loss_prev[1]=${loss[1]}  || exit 1;
-    cp $mdl_best $dir/final.mdl || exit 1;
+    cp $mdl_best $dir/final.mdl
 fi
 
   mv $dir/log/train.$epoch.1.1.log $dir/log/train.$epoch.log || exit 1;
@@ -471,7 +406,6 @@ fi
   echo "$learning_rate" > $dir/lr
   echo "${loss_prev[0]}" > $dir/loss_prev
   echo "$num_stop_halving" > $dir/stopping
-  echo "$num_stop_halving_acc" > $dir/stopping_acc
 
 done
 rm $mdl_temp
