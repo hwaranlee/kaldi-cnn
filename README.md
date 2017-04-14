@@ -14,8 +14,7 @@ We provide:
 
 0. Download and install the Kaldi Speech Recognition Toolkit from [[kaldi-git-trunk](https://github.com/kaldi-asr/kaldi)].
 
-1. In the file "src/cudamatrix/cu-matrix.h"
-Copy and paste the followings as member functions of class CuMatrixBase
+1. In the file "src/cudamatrix/cu-matrix.h", copy and paste the followings as member functions of class CuMatrixBase
 
 		// Convolution 'this' with kernel => out
 		// this matrix : row = num_chunks, col=in_height * in_width * in_channel
@@ -53,11 +52,11 @@ Copy and paste the followings as member functions of class CuMatrixBase
 												int32 in_height, int32 in_width, int32 pool_height_dim, int32 pool_width_dim, int32 pool_channel_dim) const;
 
 
-2. Add new components in nnet0 into nnet2 header and source codes.
+2. Add new components in nnet0 into nnet2's header and source codes.
 
 + In the file "src/nnet2/nnet-component.cc"
 	+ add: #include "nnet0/nnet-component-nnet0.h"
-	+  add followings under "Component\* Component::NewComponentOfType(const std::string &component_type) "
+	+ add followings under "Component\* Component::NewComponentOfType(const std::string &component_type) "
 <pre><code>
   } else if (component_type == "ConvolutionComponent") {
     ans = new cnsl::nnet0::ConvolutionComponent();
@@ -72,9 +71,9 @@ Copy and paste the followings as member functions of class CuMatrixBase
 	+ Change the ChunkInfo's private variables to be "public"
 	+ In the class NonlinearComponent, change 'UpdateStates' function to be "public"
 
-3. Add "src/cnslmat" folder and make
+3. Copy "src/cnslmat" folder into the kaldi trunk and make
 
-4. Add "src/nnet0" folder and make 
+4. Copy "src/nnet0" folder into the kaldi trunk and make 
 
 5. In the file "src/nnet2bin/Makefile" add followings:
 ADDLIBS ../nnet0/cnsl-nnet0.a ../cnslmat/cnsl-cnslmat.a
