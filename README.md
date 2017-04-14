@@ -82,12 +82,12 @@ ADDLIBS ../nnet0/cnsl-nnet0.a ../cnslmat/cnsl-cnslmat.a
 	cd ../src
 	make
 
-# Guide to run the library
+## Guide to run the library
 1. To train CNN, run "local/nnet0/run_nnet.sh". 
 Before you run the code, you need a network configuration file "nnet.conf" in your experiment directory. Also when the network includes dropout layers, "dropout_scale.config" file is required.
 
 
-# Note
+## Note
 - Implemented by Hwaran Lee (Computational NeroSystems Labs, KAIST)
 - under KALDI Revision 4510
 - updated date : 2015. 05. 15.
