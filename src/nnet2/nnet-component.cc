@@ -114,7 +114,10 @@ Component* Component::NewComponentOfType(const std::string &component_type) {
   } else if (component_type == "MaxpoolComponent") {
     ans = new cnsl::nnet0::MaxpoolComponent();
   } else if (component_type == "FullyConnectedComponent") {
+          //AffineComponent Hwaran version
     ans = new cnsl::nnet0::FullyConnectedComponent();
+  }else if (component_type == "ProbReLUComponent") {
+    ans = new cnsl::nnet0::ProbReLUComponent();
   }
  
   return ans;

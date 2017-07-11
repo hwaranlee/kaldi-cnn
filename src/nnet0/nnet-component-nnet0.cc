@@ -776,7 +776,7 @@ namespace cnsl {
 				//KALDI_LOG << "update done";
 		}
 
-		void MaxpoolComponent::Init(int32 input_dim, int32 output_dim, int32 in_height, int32 in_width, int32 in_channel, int32 pool_height_dim, int32 pool_width_dim, int32 pool_channel_dim, bool overlap, bool overlap2D){
+		void MaxpoolComponent::Init(int32 input_dim, int32 output_dim, int32 in_height, int32 in_width, int32 in_channel, int32 pool_height_dim, int32 pool_width_dim, int32 pool_channel_dim, bool overlap){
 			input_dim_ = input_dim;
 			output_dim_ = output_dim;
 			in_height_ = in_height;
@@ -786,22 +786,13 @@ namespace cnsl {
 			pool_width_dim_ = pool_width_dim;
 			pool_channel_dim_ = pool_channel_dim;
 			overlap_=overlap;
-			overlap2D_ = overlap2D;
 
 			KALDI_ASSERT((in_height_ * in_width_ * in_channel_) == input_dim_ );
 			KALDI_ASSERT(input_dim_ > 0 && output_dim_ > 0  && pool_height_dim_ > 0 && pool_width_dim_ > 0 && pool_channel_dim_ > 0);			
 			KALDI_ASSERT(in_height_ % pool_height_dim_ == 0);
 			KALDI_ASSERT(in_width_ % pool_width_dim_ == 0);
-			KALDI_ASSERT( (overlap && overlap2D ) != true);
 
-			if (overlap2D){
-				//pooling region size = [ pool_channel_dim x pool_channel_dim ]
-				KALDI_ASSERT(pool_height_dim_==1 && pool_width_dim_ ==1);
-				int32 output_channel_ = output_dim_ / (in_height_ * in_width_);
-				int32 expected_output_channel = pow((sqrt(in_channel_) - pool_channel_dim_ + 1),2);
-				KALDI_ASSERT( output_channel_ == expected_output_channel);
-			
-			}else if (overlap){
+			if (overlap){
 				KALDI_ASSERT(pool_height_dim_==1 && pool_width_dim_ ==1);
 				KALDI_ASSERT(input_dim_ / in_channel_ * (in_channel_ - pool_channel_dim_ +1) == output_dim_ );
 			}else{
@@ -820,7 +811,6 @@ namespace cnsl {
 			int32 pool_width_dim = 1;
 			int32 pool_channel_dim = 1;
 			bool overlap = false;
-			bool overlap2D = false;
 
 			bool ok = ParseFromString("in-height", &args, &in_height) &&
 				ParseFromString("in-width", &args, &in_width) &&
@@ -830,16 +820,11 @@ namespace cnsl {
 				ParseFromString("pool-channel-dim", &args, &pool_channel_dim);
 
 			ParseFromString("overlap", &args, &overlap);			
-			ParseFromString("overlap2D", &args, &overlap2D);			
 
 			int32 input_dim = in_height*in_width*in_channel;
 			int32 output_dim;
 
-			if (overlap2D){
-				int32 output_channel = pow((sqrt(in_channel) - pool_channel_dim + 1),2);
-				output_dim = input_dim / in_channel * output_channel;			
-			}
-			else if (overlap){
+			if (overlap){
 				output_dim = input_dim / in_channel * (in_channel - pool_channel_dim +1);
 			}
 			else{
@@ -862,7 +847,7 @@ namespace cnsl {
 				KALDI_ERR << "Invalid initializer for layer of type "
 				<< Type() << ": \"" << orig_args << "\"";
 
-			Init(input_dim, output_dim, in_height, in_width, in_channel, pool_height_dim, pool_width_dim, pool_channel_dim, overlap, overlap2D);
+			Init(input_dim, output_dim, in_height, in_width, in_channel, pool_height_dim, pool_width_dim, pool_channel_dim, overlap);
 
 		}
 
@@ -876,7 +861,7 @@ namespace cnsl {
 				//CuMatrix<BaseFloat> out_temp(in_info.NumChunks(), output_dim_);
 				//in.Maxpool_prop(in_height_, in_width_, pool_height_dim_, pool_width_dim_, pool_channel_dim_, overlap_, &out_temp);
 				//out->CopyFromMat(out_temp, kNoTrans);
-				in.Maxpool_prop(in_height_, in_width_, pool_height_dim_, pool_width_dim_, pool_channel_dim_, overlap_, overlap2D_, out);				
+				in.Maxpool_prop(in_height_, in_width_, pool_height_dim_, pool_width_dim_, pool_channel_dim_, overlap_, out);				
 		}
 
 		void MaxpoolComponent::Backprop(const ChunkInfo &in_info,
@@ -888,7 +873,7 @@ namespace cnsl {
 			CuMatrix<BaseFloat> *in_deriv) const {
 				in_deriv->Resize(in_value.NumRows(), in_value.NumCols(), kSetZero);
 				KALDI_ASSERT(output_dim_ == out_value.NumCols());				
-				in_value.Maxpool_backprop(out_value, out_deriv, in_deriv, in_height_, in_width_, pool_height_dim_, pool_width_dim_, pool_channel_dim_, overlap_, overlap2D_);
+				in_value.Maxpool_backprop(out_value, out_deriv, in_deriv, in_height_, in_width_, pool_height_dim_, pool_width_dim_, pool_channel_dim_, overlap_);
 		}
 
 		void MaxpoolComponent::Read(std::istream &is, bool binary) {
@@ -916,19 +901,10 @@ namespace cnsl {
 			std::string tok;
 			ReadToken(is, binary, &tok);
 			if (tok == "<Overlap>") { 
-				ReadBasicType(is, binary, &overlap_);
-				ReadToken(is, binary, &tok);
-				if (tok == "<Overlap2D>") { 
-					ReadBasicType(is, binary, &overlap2D_);			
-					ExpectToken(is, binary, "</MaxpoolComponent>");
-				}
-				else{
-					overlap2D_=false;
-					ExpectToken(is, binary, "</MaxpoolComponent>");
-				}
+				ReadBasicType(is, binary, &overlap_);				
+				ExpectToken(is, binary, "</MaxpoolComponent>");
 			} else {
 				overlap_=false;
-				overlap2D_=false;
 				KALDI_ASSERT(tok == ostr_end.str());
 			}
 		}
@@ -950,11 +926,9 @@ namespace cnsl {
 			WriteToken(os, binary, "<PoolWidthDim>");
 			WriteBasicType(os, binary, pool_width_dim_);
 			WriteToken(os, binary, "<PoolChannelDim>");
-			WriteBasicType(os, binary, pool_channel_dim_);			
+			WriteBasicType(os, binary, pool_channel_dim_);
 			WriteToken(os, binary, "<Overlap>");
 			WriteBasicType(os, binary, overlap_);
-			WriteToken(os, binary, "<Overlap2D>");
-			WriteBasicType(os, binary, overlap2D_);
 			WriteToken(os, binary, "</MaxpoolComponent>");
 		}
 
@@ -971,8 +945,7 @@ namespace cnsl {
 				<< ", pool_width_dim_ = " << pool_width_dim_
 				<< ", pool_channel_dim_ = " << pool_channel_dim_
 				
-				<< ", max-pool-overlap_ = " << overlap_
-				<< ", max-pool-overlap_2D = " << overlap2D_;
+				<< ", max-pool-overlap_ = " << overlap_;
 
 			return stream.str();
 		}
@@ -1147,6 +1120,120 @@ namespace cnsl {
 				linear_params_.AddMatMat(learning_rate, out_deriv, kTrans, in_value, kNoTrans, 1.0);
 				*/
 				//KALDI_LOG << "weight_decay : " << weight_decay_;
+		}
+
+		std::string ProbReLUComponent::Info() const {
+			std::stringstream stream;
+			stream << Component::Info() << ", expectation = "
+				<< expectation_ ;
+			return stream.str();
+		}
+
+		void ProbReLUComponent::InitFromString(std::string args) {
+			std::string orig_args(args);
+			int32 dim;
+			bool expectation = false;
+			bool ok = ParseFromString("dim", &args, &dim);
+			ParseFromString("expectation", &args, &expectation);
+
+			if (!ok || !args.empty() || dim <= 0)
+				KALDI_ERR << "Invalid initializer for layer of type ProbReLUComponent: \""
+				<< orig_args << "\"";
+			Init(dim, expectation);
+		}
+
+		void ProbReLUComponent::Read(std::istream &is, bool binary) {
+			ExpectOneOrTwoTokens(is, binary, "<ProbReLUComponent>", "<Dim>");
+			ReadBasicType(is, binary, &dim_);
+			ExpectToken(is, binary, "<Expectation>");
+			ReadBasicType(is, binary, &expectation_);
+			ExpectToken(is, binary, "</ProbReLUComponent>");
+		}
+
+		void ProbReLUComponent::Write(std::ostream &os, bool binary) const {
+			WriteToken(os, binary, "<ProbReLUComponent>");
+			WriteToken(os, binary, "<Dim>");
+			WriteBasicType(os, binary, dim_);
+			WriteToken(os, binary, "<Expectation>");
+			WriteBasicType(os, binary, expectation_);
+			WriteToken(os, binary, "</ProbReLUComponent>");
+		}
+
+		void ProbReLUComponent::Init(int32 dim,	bool expectation){
+				dim_ = dim;
+				expectation_ = expectation;
+		}
+
+		Component* ProbReLUComponent::Copy() const {
+			ProbReLUComponent *ans = new ProbReLUComponent();
+			ans->dim_ = dim_;
+			ans->expectation_ = expectation_;
+			return ans;
+		}
+
+		void ProbReLUComponent::Propagate(const ChunkInfo &in_info,
+			const ChunkInfo &out_info,
+			const CuMatrixBase<BaseFloat> &in,
+			CuMatrixBase<BaseFloat> *out) const  {
+				// Apply rectified linear function (x >= 0 ? 1.0 : 0.0)
+				CuMatrix<BaseFloat> prob(in.NumRows(), in.NumCols());				
+				prob.CopyFromMat(in);
+				prob.ApplyFloor(0.0); // ReLU
+				prob.Add(1.0); //p=1-1/(in+1);
+				prob.ApplyPow(-1.0);
+				prob.Scale(-1.0);
+				prob.Add(1.0);
+				//KALDI_LOG << "in = " << in;
+				//KALDI_LOG << "prob = " << prob;
+
+				out_info.CheckSize(*out);
+				KALDI_ASSERT(in_info.NumChunks() == out_info.NumChunks());
+				KALDI_ASSERT(in.NumCols() == this->InputDim());
+
+				if (!expectation_){
+					// This const_cast is only safe assuming you don't attempt
+					// to use multi-threaded code with the GPU.
+					const_cast<CuRand<BaseFloat>&>(random_generator_).RandUniform(out);
+					//KALDI_LOG << "out = " << *out;
+					out->AddMat(-1.0, prob);
+					out->Scale(-1.0);
+					out->ApplyHeaviside(); // apply the function (x>0?1:0).  Now, a proportion "dp" will
+					// be 1.0 and (1-dp) will be 0.0  
+					//KALDI_LOG << "out_mask = " << *out;
+					out->MulElements(in);
+					//KALDI_LOG << "bernouilli";
+				}else{
+					//KALDI_LOG << "expectation ";
+					out->CopyFromMat(prob);
+					out->MulElements(in);
+					//KALDI_LOG << "prob = " << prob;
+					//KALDI_LOG << "out = " << *out;
+
+				}
+
+		}
+
+		void ProbReLUComponent::Backprop(const ChunkInfo &,  //in_info,
+			const ChunkInfo &,  //out_info,
+			const CuMatrixBase<BaseFloat> &,  //in_value,
+			const CuMatrixBase<BaseFloat> &out_value,
+			const CuMatrixBase<BaseFloat> &out_deriv,
+			Component *to_update, // may be identical to "this".
+			CuMatrix<BaseFloat> *in_deriv) const  {
+
+				in_deriv->Resize(out_deriv.NumRows(), out_deriv.NumCols(),
+					kUndefined);
+				in_deriv->CopyFromMat(out_value);
+				in_deriv->ApplyHeaviside();
+				// Now in_deriv(i, j) equals (out_value(i, j) > 0.0 ? 1.0 : 0.0),
+				// which is the derivative of the nonlinearity (well, except at zero
+				// where it's undefined).
+				if (to_update != NULL)
+					dynamic_cast<NonlinearComponent*>(to_update)->UpdateStats(out_value,
+					in_deriv);
+				
+				// Updatestates -> public function
+				in_deriv->MulElements(out_deriv);
 		}
 
 		void ConvolutionComponentContainer::InitFromString(std::string args) {

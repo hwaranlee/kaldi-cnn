@@ -148,11 +148,11 @@ namespace cnsl {
 		class MaxpoolComponent: public nnet2::Component {
 
 		public:
-			void Init(int32 input_dim, int32 output_dim, int32 in_height, int32 in_width, int32 in_channel, int32 pool_height_dim, int32 pool_width_dim, int32 pool_channel_dim, bool overlap, bool overlap2D);
-			explicit MaxpoolComponent(int32 input_dim, int32 output_dim, int32 in_height, int32 in_width, int32 in_channel, int32 pool_height_dim, int32 pool_width_dim, int32 pool_channel_dim, bool overlap, bool overlap2D) {
-				Init(input_dim, output_dim, in_height, in_width, in_channel, pool_height_dim, pool_width_dim, pool_channel_dim, overlap, overlap2D);
+			void Init(int32 input_dim, int32 output_dim, int32 in_height, int32 in_width, int32 in_channel, int32 pool_height_dim, int32 pool_width_dim, int32 pool_channel_dim, bool overlap);
+			explicit MaxpoolComponent(int32 input_dim, int32 output_dim, int32 in_height, int32 in_width, int32 in_channel, int32 pool_height_dim, int32 pool_width_dim, int32 pool_channel_dim, bool overlap) {
+				Init(input_dim, output_dim, in_height, in_width, in_channel, pool_height_dim, pool_width_dim, pool_channel_dim, overlap);
 			}
-			MaxpoolComponent(): input_dim_(0), output_dim_(0), in_height_(0), in_width_(0), in_channel_(0), pool_height_dim_(0), pool_width_dim_(0), pool_channel_dim_(0), overlap_(false) , overlap2D_(false){ }
+			MaxpoolComponent(): input_dim_(0), output_dim_(0), in_height_(0), in_width_(0), in_channel_(0), pool_height_dim_(0), pool_width_dim_(0), pool_channel_dim_(0), overlap_(false) { }
 			virtual std::string Type() const { return "MaxpoolComponent"; }
 			virtual void InitFromString(std::string args); 
 			virtual int32 InputDim() const { return input_dim_; }
@@ -171,7 +171,7 @@ namespace cnsl {
 				CuMatrix<BaseFloat> *in_deriv) const;
 			virtual bool BackpropNeedsInput() const { return true; }
 			virtual bool BackpropNeedsOutput() const { return true; }
-			virtual Component* Copy() const { return new MaxpoolComponent(input_dim_, output_dim_, in_height_, in_width_, in_channel_, pool_height_dim_, pool_width_dim_,	pool_channel_dim_, overlap_ , overlap2D_); }
+			virtual Component* Copy() const { return new MaxpoolComponent(input_dim_, output_dim_, in_height_, in_width_, in_channel_, pool_height_dim_, pool_width_dim_,	pool_channel_dim_, overlap_ ); }
 
 			virtual void Read(std::istream &is, bool binary); // This Read function
 			virtual void Write(std::ostream &os, bool binary) const; /// Write component to stream
@@ -187,7 +187,6 @@ namespace cnsl {
 			int32 pool_width_dim_;
 			int32 pool_channel_dim_;
 			bool overlap_;
-			bool overlap2D_;
 		};
 
 		class FullyConnectedComponent: public nnet2::AffineComponent {
@@ -231,7 +230,55 @@ namespace cnsl {
 
 		};
 		
-	class ConvolutionComponentContainer: public nnet2::UpdatableComponent{
+		class ProbReLUComponent: public nnet2::NonlinearComponent {
+		public:
+
+			//explicit ProbReLUComponent(int32 dim, bool expectation): NonlinearComponent(dim) { expectation_= expectation; }
+			//explicit ProbReLUComponent(int32 dim): NonlinearComponent(dim) {}
+			explicit ProbReLUComponent(const ProbReLUComponent &other);
+
+			void Init(int32 dim, bool expectation);
+			ProbReLUComponent(int32 dim, bool expectation = false) {
+				Init(dim, expectation);
+			}
+			ProbReLUComponent(): dim_(0), expectation_(false) { }
+			virtual int32 InputDim() const { return dim_; }
+			virtual int32 OutputDim() const { return dim_; }
+			virtual void InitFromString(std::string args);
+
+			virtual void Read(std::istream &is, bool binary);
+			virtual void Write(std::ostream &os, bool binary) const;		
+
+			virtual std::string Type() const { return "ProbReLUComponent"; }
+			virtual Component* Copy() const;		
+			virtual bool BackpropNeedsInput() const { return false; }
+			virtual bool BackpropNeedsOutput() const { return true; }
+
+			using Component::Propagate; // to avoid name hiding
+			virtual void Propagate(const ChunkInfo &in_info,
+				const ChunkInfo &out_info,
+				const CuMatrixBase<BaseFloat> &in,
+				CuMatrixBase<BaseFloat> *out) const; 
+			virtual void Backprop(const ChunkInfo &in_info,
+				const ChunkInfo &out_info,
+				const CuMatrixBase<BaseFloat> &in_value,
+				const CuMatrixBase<BaseFloat> &out_value,                        
+				const CuMatrixBase<BaseFloat> &out_deriv,
+				Component *to_update, // may be identical to "this".
+				CuMatrix<BaseFloat> *in_deriv) const;
+
+			void ResetGenerator() { random_generator_.SeedGpu(0); }
+			void SetExpectation(bool boolExpectation) { expectation_ = boolExpectation; }
+			virtual std::string Info() const;
+
+		private:
+			int32 dim_;  
+			ProbReLUComponent &operator = (const ProbReLUComponent &other); // Disallow.
+			CuRand<BaseFloat> random_generator_;
+			bool expectation_;
+		};
+		
+		class ConvolutionComponentContainer: public nnet2::UpdatableComponent{
 
 		public:
 			/*
