@@ -6,8 +6,6 @@
 !/src/*/Makefile
 !/src/*/README
 
-
-
 # Compiled Object files and python ciles
 *.slo
 *.lo
@@ -77,8 +75,13 @@ GSYMS
 /egs/*/s*/mfcc
 /egs/*/s*/plp
 /egs/*/s*/exp
-/egs/*/s*/data
+/egs/*/s*/data*
+
 /egs_orig
+/egs/*/s*/fmllr
+/egs/*/s*/fbank*
+
+
 
 # /tools/
 /tools/ATLAS/
