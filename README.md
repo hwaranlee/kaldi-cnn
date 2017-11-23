@@ -2,8 +2,8 @@
 
 ## Introduction
 This Git repository is the CNN source code following the nnet2 (Dan's DNN implementation) in KALDI Speech Recognition Toolkit, which is the implementation of the paper:
-Lee, Hwaran, et al. "Deep CNNs Along the Time Axis With Intermap Pooling for Robustness to Spectral Variations." IEEE Signal Processing Letters 23.10 (2016): 1310-1314. [[paper](https://arxiv.org/abs/1606.03207)]
-
+Lee, Hwaran, et al. "Deep CNNs Along the Time Axis With Intermap Pooling for Robustness to Spectral Variations." IEEE Signal Processing Letters 23.10 (2016): 1310-1314. [[paper](https://arxiv.org/abs/1606.03207)] [[demo](https://www.youtube.com/watch?time_continue=3&v=wKbLlqVd524)]
+ 
 We provide:
 1. 2D Convolution layer (ConvoutionComponent)
 2. 3D Maxpooling layer (MaxpoolComponent)
